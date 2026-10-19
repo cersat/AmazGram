@@ -1,0 +1,64 @@
+{
+	"configVersion": "v2",
+	"app": {
+		"appId": 1080585,
+		"appName": "TG Watch",
+		"appType": "app",
+		"version": {
+			"code": 10,
+			"name": "0.5.5"
+		},
+		"icon": "icon.png",
+		"vender": "sercatdar",
+		"description": "Telegram на часах через свой прокси"
+	},
+	"permissions": [],
+	"runtime": {
+		"apiVersion": {
+			"compatible": "1.0.0",
+			"target": "1.0.1",
+			"minVersion": "1.0.0"
+		}
+	},
+	"targets": {
+		"gts4mini": {
+			"module": {
+				"page": {
+					"pages": [
+						"page/index",
+						"page/chats",
+						"page/topics",
+						"page/chat",
+						"page/compose"
+					]
+				},
+				"app-side": {
+					"path": "app-side/index"
+				},
+				"setting": {
+					"path": "setting/index"
+				}
+			},
+			"platforms": [
+				{
+					"name": "gts4mini",
+					"deviceSource": 246
+				},
+				{
+					"name": "gts4mini-w",
+					"deviceSource": 247
+				}
+			],
+			"designWidth": 336
+		}
+	},
+	"i18n": {
+		"en-US": {
+			"appName": "TG Watch"
+		},
+		"ru-RU": {
+			"appName": "TG Watch"
+		}
+	},
+	"defaultLanguage": "en-US"
+}
