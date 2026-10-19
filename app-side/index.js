@@ -2,7 +2,7 @@ import { MessageBuilder } from '../shared/message'
 
 const messageBuilder = new MessageBuilder()
 
-const DEFAULT_URL = 'http://100.116.79.62:8787'
+const DEFAULT_URL = 'http://127.0.0.1:8787'
 const DEFAULT_QUICK = 'Ок|Да|Нет|Сейчас не могу, напишу позже|Уже иду|Спасибо!'
 
 function setting(key, def) {
@@ -49,7 +49,7 @@ async function api(path, method, body) {
 		if (body) opts.body = JSON.stringify(body)
 		res = await fetch(opts)
 	} catch (e) {
-		return { error: 'Нет связи с прокси. Tailscale на телефоне включён?' }
+		return { error: 'Нет связи с TG Bridge. Приложение на телефоне запущено?' }
 	}
 	if (res.status === 401) {
 		return { error: 'Токен не подошёл' }
@@ -107,6 +107,7 @@ async function handle(method, params) {
 	if (method === 'MESSAGES') {
 		let path = '/messages?chat=' + encodeURIComponent(params.chat) + '&limit=' + (params.limit || 15)
 		if (params.topic) path += '&topic=' + encodeURIComponent(params.topic)
+		if (params.before) path += '&before=' + encodeURIComponent(params.before)
 		const r = await api(path)
 		if (r.error) return r
 		return {
@@ -121,6 +122,29 @@ async function handle(method, params) {
 				replyId: m.reply_id || null,
 				replyPreview: m.reply_preview ? short(m.reply_preview, 40) : null
 			}))
+		}
+	}
+	if (method === 'ALERTS') {
+		const r = await api('/alerts?after=' + (params.after || 0))
+		if (r.error) return r
+		const preview = setting('alert_preview', 'true') !== 'false'
+		return {
+			seq: r.seq,
+			count: r.count || 0,
+			items: (r.items || []).map((a) => ({
+				id: a.id,
+				chat: a.chat,
+				topic: a.topic || 0,
+				name: short(a.name, 28),
+				from: short(a.from, 20),
+				// при выключенном предпросмотре текст не уходит на часы вообще
+				text: preview ? short(a.text, 140) : ''
+			})),
+			cfg: {
+				scene: parseInt(setting('alert_scene', '9'), 10),
+				bright: parseInt(setting('alert_bright', '15'), 10) || 15,
+				preview
+			}
 		}
 	}
 	if (method === 'SEND') {

@@ -1,4 +1,5 @@
 import { W, PAD, TOP, C, hideStatusBar, req, Layer, onTap, statusText, button } from '../utils/ui'
+import { loadState, saveState, arm, disarm } from '../utils/alerts'
 
 const ROW_H = 64
 const ROW_GAP = 8
@@ -24,8 +25,46 @@ Page({
 		})
 		button(head, W - PAD - 20 - 64, TOP - 8, 64, 44, 'Обн', () => this.load(), C.accent, C.accentPress, 22)
 
+		this.initAlarmButton(head)
 		this.state.list = new Layer()
 		this.load()
+	},
+
+	// включает/выключает цепочку будильников (проверка новых сообщений раз в 30 с)
+	initAlarmButton(head) {
+		const state = loadState()
+		const label = () => (state.on ? 'Будильник: вкл' : 'Будильник: выкл')
+		const btn = button(
+			head,
+			PAD + 20,
+			TOP + 44,
+			W - (PAD + 20) * 2,
+			44,
+			label(),
+			() => {
+				if (state.on) {
+					state.on = false
+					disarm(state)
+				} else {
+					state.on = true
+					state.seq = 0 // новая точка отсчёта: старые сообщения будильник не поднимают
+					arm(state)
+				}
+				saveState(state)
+				btn.setProperty(hmUI.prop.MORE, {
+					x: PAD + 20,
+					y: TOP + 44,
+					w: W - (PAD + 20) * 2,
+					h: 44,
+					text: label(),
+					normal_color: state.on ? C.ok : C.card,
+					press_color: state.on ? 0x1f8f3d : C.cardPress
+				})
+			},
+			state.on ? C.ok : C.card,
+			state.on ? 0x1f8f3d : C.cardPress,
+			20
+		)
 	},
 
 	load() {
@@ -43,7 +82,7 @@ Page({
 	render(folders) {
 		const list = this.state.list
 		list.clear()
-		let y = TOP + 50
+		let y = TOP + 100
 		folders.forEach((folder) => {
 			const open = () => {
 				hmApp.gotoPage({

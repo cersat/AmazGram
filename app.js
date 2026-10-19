@@ -6,7 +6,10 @@ App({
 		messageBuilder: null,
 		// метка времени последнего успешного отправленного/изменённого сообщения;
 		// chat.js сверяет её в своём таймере и обновляется сразу, не дожидаясь автотика
-		lastChatChange: 0
+		lastChatChange: 0,
+		// жесты: коллбэк регистрируется один раз, страница чата подставляет onSwipe
+		gestureRegistered: false,
+		onSwipe: null
 	},
 	onCreate() {
 		const appId = hmApp.packageInfo().appId
