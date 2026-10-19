@@ -55,9 +55,11 @@ class BridgeHttpServer(
 							(p["chat"] ?: "0").toLong(),
 							(p["topic"] ?: "0").toInt(),
 							(p["limit"] ?: "15").toInt(),
-							220
+							220,
+							(p["before"] ?: "0").toLong()
 						))
 					}
+					"/alerts" -> json(session.newAlerts((s.parms["after"] ?: "0").toLong()))
 					"/send" -> {
 						val b = body(s)
 						json(session.send(

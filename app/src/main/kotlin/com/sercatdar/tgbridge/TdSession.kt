@@ -49,6 +49,11 @@ class TdSession(
 	// добирается через GetSupergroup. chat.viewAsTopics для этого не годится: он отражает лишь
 	// режим отображения у пользователя, а не то, что в группе включены темы.
 	private val forumCache = java.util.concurrent.ConcurrentHashMap<Long, Boolean>()
+	// входящие сообщения для будильника на часах: растущий номер seq + последние 50 штук.
+	// Часы раз в 30 с спрашивают /alerts?after=<seq> и получают только то, что пришло после.
+	private class Alert(val seq: Long, val json: JSONObject)
+	private val alertSeq = java.util.concurrent.atomic.AtomicLong(0)
+	private val alerts = java.util.concurrent.ConcurrentLinkedDeque<Alert>()
 	@Volatile private var lastDiag: String? = null
 
 	private fun listKey(list: TdApi.ChatList): String = when (list) {
@@ -84,6 +89,7 @@ class TdSession(
 					is TdApi.UpdateAuthorizationState -> handleAuthState(update.authorizationState)
 					is TdApi.UpdateChatFolders -> lastFolders = update.chatFolders
 					is TdApi.UpdateSupergroup -> forumCache[update.supergroup.id] = update.supergroup.isForum
+					is TdApi.UpdateNewMessage -> recordAlert(update.message)
 					is TdApi.UpdateNewChat -> {
 						chatCache[update.chat.id] = update.chat
 						update.chat.positions.forEach { pos -> recordPosition(update.chat.id, pos) }
@@ -111,6 +117,50 @@ class TdSession(
 		} catch (e: Exception) {
 			// "Not Found" здесь означает "все чаты этого списка уже загружены" — это
 			// нормальный и частый исход (особенно при десятках папок), не логируем как шум
+		}
+	}
+
+	private suspend fun recordAlert(msg: TdApi.Message) {
+		if (msg.isOutgoing) return
+		val chat = chatCache[msg.chatId] ?: return
+		// заглушённые чаты не будят часы — так же, как не шумят в самом Telegram
+		if ((chat.notificationSettings?.muteFor ?: 0) > 0) return
+		val sender = msg.senderId
+		val from = try {
+			if (sender != null) cut(senderName(sender), 20) else ""
+		} catch (e: Exception) {
+			""
+		}
+		val topic = (msg.topicId as? TdApi.MessageTopicForum)?.forumTopicId ?: 0
+		val seq = alertSeq.incrementAndGet()
+		alerts.addLast(Alert(seq, JSONObject().apply {
+			put("seq", seq)
+			put("id", msg.id)
+			put("chat", msg.chatId)
+			put("topic", topic)
+			put("name", cut(chat.title, 28))
+			put("from", from)
+			put("text", cut(messageText(msg), 160))
+			put("date", msg.date)
+			put("unread", chat.unreadCount)
+		}))
+		while (alerts.size > 50) alerts.pollFirst()
+	}
+
+	// after=0 — первый вопрос часов: отдаём только текущий номер как точку отсчёта,
+	// чтобы они не получили залпом всё, что накопилось до включения будильника
+	fun newAlerts(after: Long): JSONObject {
+		val current = alertSeq.get()
+		val items = JSONArray()
+		if (after > 0) {
+			alerts.filter { it.seq > after }.takeLast(5).forEach { items.put(it.json) }
+		}
+		return JSONObject().apply {
+			put("ok", true)
+			put("seq", current)
+			put("items", items)
+			// сколько всего новых, даже если в items влезли только последние 5
+			put("count", if (after > 0) (current - after).coerceAtLeast(0) else 0)
 		}
 	}
 
@@ -391,16 +441,27 @@ class TdSession(
 		return JSONObject().apply { put("ok", true); put("topics", out) }
 	}
 
-	suspend fun messages(chatId: Long, topicId: Int, limit: Int, textLimit: Int): JSONObject {
+	suspend fun messages(chatId: Long, topicId: Int, limit: Int, textLimit: Int, beforeId: Long = 0): JSONObject {
 		ensureChatKnown(chatId)
-		val history = if (topicId != 0) {
-			client.send(TdApi.GetForumTopicHistory(chatId, topicId, 0, 0, limit)) as? TdApi.Messages
-		} else {
-			client.send(TdApi.GetChatHistory(chatId, 0, 0, limit, false)) as? TdApi.Messages
-		} ?: return JSONObject().apply { put("ok", false); put("error", "не удалось получить историю") }
+		// с from_message_id TDLib отдаёт и само это сообщение — просим на одно больше и выкидываем его
+		val ask = if (beforeId != 0L) limit + 1 else limit
+		suspend fun fetch(): List<TdApi.Message>? {
+			val res = if (topicId != 0) {
+				client.send(TdApi.GetForumTopicHistory(chatId, topicId, beforeId, 0, ask))
+			} else {
+				client.send(TdApi.GetChatHistory(chatId, beforeId, 0, ask, false))
+			}
+			return (res as? TdApi.Messages)?.messages?.filter { beforeId == 0L || it.id < beforeId }
+		}
+		var batch = fetch() ?: return JSONObject().apply { put("ok", false); put("error", "не удалось получить историю") }
+		if (beforeId != 0L && batch.isEmpty()) {
+			// старую историю TDLib может сперва отдать пустой, пока подтягивает её с сервера
+			kotlinx.coroutines.delay(500)
+			batch = fetch() ?: batch
+		}
 
-		val items = history.messages.reversed().map { messageJson(it, textLimit) }
-		if (topicId == 0) {
+		val items = batch.reversed().map { messageJson(it, textLimit) }
+		if (topicId == 0 && beforeId == 0L) {
 			client.send(TdApi.OpenChat(chatId))
 		}
 		return JSONObject().apply {
