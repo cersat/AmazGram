@@ -243,7 +243,26 @@ class MainActivity : Activity() {
 		ui.text(watch, "•••• " + token.takeLast(4), 16f)
 		ui.primary(watch, "Скопировать токен") { copy("Токен TG Bridge", token, "Токен скопирован") }
 
+		notifyCard()
 		batteryCard()
+	}
+
+	// уведомления Android, которые Zepp показывает на часах
+	private fun notifyCard() {
+		val on = Notifier.isEnabled(prefs)
+		val card = ui.card(root)
+		ui.statusRow(
+			card, if (on) Palette.ok else Palette.dim,
+			if (on) "Уведомления на часы включены" else "Уведомления на часы выключены",
+			"Новые сообщения придут обычным уведомлением, а Zepp перешлёт его на часы."
+		)
+		if (on) {
+			ui.text(card, "Один раз включи в Zepp: Профиль → твои часы → Оповещения приложений → TG Bridge.", 13f, Palette.dim)
+		}
+		ui.secondary(card, if (on) "Выключить" else "Включить") {
+			prefs.edit().putBoolean(Notifier.PREF_KEY, !on).apply()
+			render()
+		}
 	}
 
 	private fun batteryCard() {

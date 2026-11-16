@@ -29,7 +29,11 @@ object DiagLog {
 class TdSession(
 	context: Context,
 	private val prefs: SharedPreferences,
-	private val onAuthState: (String) -> Unit
+	private val onAuthState: (String) -> Unit,
+	// новое входящее в незаглушённом чате: (chatId, название чата, отправитель, текст, непрочитанных)
+	private val onIncoming: (Long, String, String, String, Int) -> Unit = { _, _, _, _, _ -> },
+	// все сообщения чата прочитаны
+	private val onChatRead: (Long) -> Unit = {}
 ) {
 	private val client: TdClient
 	private var ready = false
@@ -90,6 +94,7 @@ class TdSession(
 					is TdApi.UpdateChatFolders -> lastFolders = update.chatFolders
 					is TdApi.UpdateSupergroup -> forumCache[update.supergroup.id] = update.supergroup.isForum
 					is TdApi.UpdateNewMessage -> recordAlert(update.message)
+					is TdApi.UpdateChatReadInbox -> if (update.unreadCount == 0) onChatRead(update.chatId)
 					is TdApi.UpdateNewChat -> {
 						chatCache[update.chat.id] = update.chat
 						update.chat.positions.forEach { pos -> recordPosition(update.chat.id, pos) }
@@ -145,6 +150,7 @@ class TdSession(
 			put("unread", chat.unreadCount)
 		}))
 		while (alerts.size > 50) alerts.pollFirst()
+		onIncoming(msg.chatId, cut(chat.title, 40), from, cut(messageText(msg), 200), chat.unreadCount)
 	}
 
 	// after=0 — первый вопрос часов: отдаём только текущий номер как точку отсчёта,

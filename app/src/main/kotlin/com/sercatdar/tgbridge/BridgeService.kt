@@ -46,10 +46,16 @@ class BridgeService : Service() {
 		createChannel()
 		startForeground(NOTIF_ID, buildNotification("Запуск..."))
 
-		session = TdSession(applicationContext, prefs) { state ->
-			lastAuthState = state
-			updateNotification()
-		}
+		val notifier = Notifier(applicationContext, prefs)
+		session = TdSession(
+			applicationContext, prefs,
+			onAuthState = { state ->
+				lastAuthState = state
+				updateNotification()
+			},
+			onIncoming = { chatId, title, from, text, unread -> notifier.post(chatId, title, from, text, unread) },
+			onChatRead = { chatId -> notifier.clear(chatId) }
+		)
 		activeSession = session
 		session.start(scope)
 
