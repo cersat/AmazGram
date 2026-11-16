@@ -1,4 +1,5 @@
-import { W, PAD, TOP, C, hideStatusBar, req, Layer, onTap, statusText, button } from '../utils/ui'
+import { W, PAD, TOP, C, hideStatusBar, Layer, onTap, statusText, button } from '../utils/ui'
+import { loadCached } from '../utils/cache'
 
 const ROW_H = 64
 const ROW_GAP = 8
@@ -46,14 +47,17 @@ Page({
 
 	load() {
 		const list = this.state.list
-		list.clear()
-		statusText(list, 'Загрузка...')
-		req('TOPICS', { chat: this.state.chat.id })
-			.then((r) => this.render(r.topics || []))
-			.catch((e) => {
+		loadCached('TOPICS', { chat: this.state.chat.id }, 'topics_' + this.state.chat.id, {
+			loading: () => {
+				list.clear()
+				statusText(list, 'Загрузка...')
+			},
+			show: (r) => this.render(r.topics || []),
+			fail: (e) => {
 				list.clear()
 				statusText(list, 'Ошибка:\n' + e.message + '\n\nЖми Обн', C.danger)
-			})
+			}
+		})
 	},
 
 	render(topics) {

@@ -1,5 +1,6 @@
 import { W, PAD, TOP, C, hideStatusBar, req, Layer, onTap, statusText, button } from '../utils/ui'
 import { loadState, saveState, arm, disarm, GUARD_SEC } from '../utils/alerts'
+import { loadCached } from '../utils/cache'
 
 const ROW_H = 64
 const ROW_GAP = 8
@@ -25,51 +26,31 @@ Page({
 		})
 		button(head, W - PAD - 20 - 64, TOP - 8, 64, 44, 'Обн', () => this.load(), C.accent, C.accentPress, 22)
 
-		this.initAlarmButton(head)
+		this.syncAlarm()
 		this.state.list = new Layer()
 		this.load()
 	},
 
-	// включает/выключает цепочку будильников (проверка новых сообщений раз в 30 с, пока приложение закрыто)
-	initAlarmButton(head) {
-		let on = loadState().on
-		const label = () => (on ? 'Будильник: вкл' : 'Будильник: выкл')
-		const btn = button(
-			head,
-			PAD + 20,
-			TOP + 44,
-			W - (PAD + 20) * 2,
-			44,
-			label(),
-			() => {
-				// состояние читаем заново: пока страница была открыта, будильник мог сам
-				// обновить файл (новый id будильника, новая точка отсчёта)
+	// будильник включается в настройках Zepp; часы узнают об этом при открытии приложения
+	// (выключение подхватывается само: страница будильника видит флаг в ответе телефона)
+	syncAlarm() {
+		req('ALERT_CFG')
+			.then((cfg) => {
 				const state = loadState()
-				if (state.on) {
-					state.on = false
-					disarm(state)
-				} else {
+				if (cfg.on && !state.on) {
 					state.on = true
 					state.seq = 0
 					arm(state, GUARD_SEC) // приложение открыто: звено в 30 с поставит App.onDestroy
+					saveState(state)
 					this.setBaseline()
+				} else if (!cfg.on && state.on) {
+					state.on = false
+					disarm(state)
 				}
-				saveState(state)
-				on = state.on
-				btn.setProperty(hmUI.prop.MORE, {
-					x: PAD + 20,
-					y: TOP + 44,
-					w: W - (PAD + 20) * 2,
-					h: 44,
-					text: label(),
-					normal_color: on ? C.ok : C.card,
-					press_color: on ? 0x1f8f3d : C.cardPress
-				})
-			},
-			on ? C.ok : C.card,
-			on ? 0x1f8f3d : C.cardPress,
-			20
-		)
+			})
+			.catch(() => {
+				// телефон недоступен — состояние будильника остаётся прежним
+			})
 	},
 
 	// точка отсчёта берётся в момент включения, а не при первом срабатывании через 30 секунд:
@@ -90,20 +71,23 @@ Page({
 
 	load() {
 		const list = this.state.list
-		list.clear()
-		statusText(list, 'Загрузка...')
-		req('FOLDERS')
-			.then((r) => this.render(r.folders || []))
-			.catch((e) => {
+		loadCached('FOLDERS', {}, 'folders', {
+			loading: () => {
+				list.clear()
+				statusText(list, 'Загрузка...')
+			},
+			show: (r) => this.render(r.folders || []),
+			fail: (e) => {
 				list.clear()
 				statusText(list, 'Ошибка:\n' + e.message + '\n\nЖми Обн', C.danger)
-			})
+			}
+		})
 	},
 
 	render(folders) {
 		const list = this.state.list
 		list.clear()
-		let y = TOP + 100
+		let y = TOP + 52
 		folders.forEach((folder) => {
 			const open = () => {
 				hmApp.gotoPage({

@@ -124,6 +124,10 @@ async function handle(method, params) {
 			}))
 		}
 	}
+	if (method === 'ALERT_CFG') {
+		// только настройка из Zepp, без обращения к TG Bridge: работает и без связи с ним
+		return { on: setting('alert_on', 'false') === 'true' }
+	}
 	if (method === 'ALERTS') {
 		const r = await api('/alerts?after=' + (params.after || 0))
 		if (r.error) return r
@@ -141,6 +145,7 @@ async function handle(method, params) {
 				text: preview ? short(a.text, 140) : ''
 			})),
 			cfg: {
+				on: setting('alert_on', 'false') === 'true',
 				scene: parseInt(setting('alert_scene', '9'), 10),
 				bright: parseInt(setting('alert_bright', '15'), 10) || 15,
 				preview

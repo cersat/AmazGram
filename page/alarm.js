@@ -1,5 +1,5 @@
 import { W, H, PAD, TOP, C, hideStatusBar, req, Layer, button } from '../utils/ui'
-import { loadState, saveState, rearm, pauseChain, resumeChain } from '../utils/alerts'
+import { loadState, saveState, rearm, disarm, pauseChain, resumeChain } from '../utils/alerts'
 
 // Сюда попадаем только по одноразовому будильнику (utils/alerts.js).
 // Порядок: сразу взвести следующий будильник, спросить телефон о новых сообщениях,
@@ -31,6 +31,13 @@ Page({
 
 		req('ALERTS', { after: st.seq }, 15000)
 			.then((r) => {
+				if (r.cfg && r.cfg.on === false) {
+					// будильник выключили в настройках Zepp — обрываем цепочку
+					st.on = false
+					disarm(st)
+					this.leaveQuietly()
+					return
+				}
 				const known = st.seq
 				st.seq = r.seq
 				saveState(st)
