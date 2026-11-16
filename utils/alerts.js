@@ -4,8 +4,13 @@ import { readFileSync, writeFileSync } from '../shared/fs'
 // одноразовых будильников: каждый будит page/alarm, та спрашивает у телефона про новые
 // сообщения и тут же взводит следующий будильник.
 export const INTERVAL_SEC = 30
+// пока приложение открыто, будильник сработал бы поверх него и закрыл его, поэтому на это время
+// вместо 30-секундного звена ставим страховочное: оно нужно, только если выход из приложения
+// не вызвал onDestroy и цепочку некому возобновить
+export const GUARD_SEC = 900
 const FILE = 'alerts.json'
 const ALARM_PAGE = 'page/alarm'
+export const ALARM_PARAM = 'alarm'
 
 export function loadState() {
 	try {
@@ -27,23 +32,36 @@ export function saveState(state) {
 }
 
 // взводит следующий одноразовый будильник и запоминает его номер
-export function arm(state) {
+export function arm(state, delay) {
 	const id = hmApp.alarmNew({
 		file: ALARM_PAGE,
 		appid: hmApp.packageInfo().appId,
-		delay: INTERVAL_SEC
+		delay: delay || INTERVAL_SEC,
+		param: ALARM_PARAM // по нему App.onCreate отличает запуск будильником от запуска человеком
 	})
 	state.alarmId = id
 	saveState(state)
 	return id
 }
 
-// после перезагрузки часов системные будильники пропадают, а флаг "вкл" в файле остаётся —
-// цепочка молча умирает. Поэтому при открытии приложения взводим её заново, предварительно
-// отменив прежний будильник, чтобы не получить две цепочки сразу.
-export function rearm(state) {
+// отменяет прежний будильник и взводит новый, чтобы не получить две цепочки сразу
+export function rearm(state, delay) {
 	disarm(state)
-	return arm(state)
+	return arm(state, delay)
+}
+
+// приложение открыл человек: будильник не должен срабатывать поверх него.
+// Заодно лечит цепочку, потерянную при перезагрузке часов (системные будильники пропадают,
+// а флаг "вкл" в файле остаётся).
+export function pauseChain() {
+	const state = loadState()
+	if (state.on) rearm(state, GUARD_SEC)
+}
+
+// приложение закрылось (или окно будильника закрыто): снова проверяем сообщения каждые 30 с
+export function resumeChain() {
+	const state = loadState()
+	if (state.on) rearm(state)
 }
 
 export function disarm(state) {

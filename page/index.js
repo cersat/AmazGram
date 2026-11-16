@@ -1,5 +1,5 @@
 import { W, PAD, TOP, C, hideStatusBar, req, Layer, onTap, statusText, button } from '../utils/ui'
-import { loadState, saveState, arm, disarm, rearm } from '../utils/alerts'
+import { loadState, saveState, arm, disarm, GUARD_SEC } from '../utils/alerts'
 
 const ROW_H = 64
 const ROW_GAP = 8
@@ -30,14 +30,9 @@ Page({
 		this.load()
 	},
 
-	// включает/выключает цепочку будильников (проверка новых сообщений раз в 30 с)
+	// включает/выключает цепочку будильников (проверка новых сообщений раз в 30 с, пока приложение закрыто)
 	initAlarmButton(head) {
-		const initial = loadState()
-		let on = initial.on
-		if (on) {
-			// лечит цепочку, потерянную при перезагрузке часов
-			rearm(initial)
-		}
+		let on = loadState().on
 		const label = () => (on ? 'Будильник: вкл' : 'Будильник: выкл')
 		const btn = button(
 			head,
@@ -56,7 +51,7 @@ Page({
 				} else {
 					state.on = true
 					state.seq = 0
-					arm(state)
+					arm(state, GUARD_SEC) // приложение открыто: звено в 30 с поставит App.onDestroy
 					this.setBaseline()
 				}
 				saveState(state)

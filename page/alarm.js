@@ -1,5 +1,5 @@
 import { W, H, PAD, TOP, C, hideStatusBar, req, Layer, button } from '../utils/ui'
-import { loadState, saveState, arm } from '../utils/alerts'
+import { loadState, saveState, rearm, pauseChain, resumeChain } from '../utils/alerts'
 
 // Сюда попадаем только по одноразовому будильнику (utils/alerts.js).
 // Порядок: сразу взвести следующий будильник, спросить телефон о новых сообщениях,
@@ -12,19 +12,22 @@ Page({
 	state: {
 		vibrate: null,
 		stopTimer: null,
-		bright: false
+		bright: false,
+		wasOff: false
 	},
 
 	build() {
 		hideStatusBar()
+		// как только страница открылась, тип экрана уже виден: AOD значит, что часы были погашены
+		this.state.wasOff = hmSetting.getScreenType() === hmSetting.screen_type.AOD
 		const st = loadState()
 		if (!st.on) {
 			// будильник отменили, а он всё же сработал — ничего не делаем
-			hmApp.gotoHome()
+			this.leaveQuietly()
 			return
 		}
 		// следующий будильник взводим ДО запроса, иначе одна ошибка сети оборвёт всю цепочку
-		arm(st)
+		rearm(st) // rearm, а не arm: после паузы в состоянии лежит страховочный будильник
 
 		req('ALERTS', { after: st.seq }, 15000)
 			.then((r) => {
@@ -32,12 +35,19 @@ Page({
 				st.seq = r.seq
 				saveState(st)
 				if (!known || !r.items || !r.items.length) {
-					hmApp.gotoHome()
+					this.leaveQuietly()
 					return
 				}
 				this.show(r)
 			})
-			.catch(() => hmApp.gotoHome())
+			.catch(() => this.leaveQuietly())
+	},
+
+	// сообщений нет: уходим тихо. Если часы были погашены (AOD), гасим их обратно,
+	// чтобы они не светились из-за пустой проверки
+	leaveQuietly() {
+		if (this.state.wasOff) hmSetting.setScreenOff()
+		else hmApp.gotoHome()
 	},
 
 	onDestroy() {
@@ -64,6 +74,7 @@ Page({
 	},
 
 	show(r) {
+		pauseChain() // пока окно на экране, следующий будильник не должен его сносить
 		const cfg = r.cfg || {}
 		const item = r.items[r.items.length - 1] // самое свежее
 		const more = Math.max(0, (r.count || r.items.length) - 1)
@@ -150,6 +161,7 @@ Page({
 		}
 		const close = () => {
 			this.stopVibration()
+			resumeChain()
 			hmApp.gotoHome()
 		}
 		// страницу нельзя ломать удалением виджетов из их же обработчиков (ZeppOS 1.0),
