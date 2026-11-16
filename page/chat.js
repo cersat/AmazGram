@@ -431,6 +431,9 @@ Page({
 		actions.push({ label: 'Отмена', fn: () => this.closeMenu() })
 
 		this.state.menuOpen = true
+		// меню рисуется от верхнего края страницы, а страница могла быть прокручена вниз — тогда оно
+		// оказывалось выше экрана. Запоминаем прокрутку, уходим наверх и вернёмся при закрытии меню
+		this.state.savedY = hmApp.getLayerY()
 		this.state.list.clear()  // страница скроллится по общей высоте контента, спрятанный виджет её не уменьшает
 		this.state.tail.clear()
 		menu.clear()
@@ -470,12 +473,18 @@ Page({
 			)
 			y += 64
 		})
+		hmApp.setLayerY(0)
 	},
 
 	closeMenu() {
 		this.state.menuOpen = false
 		this.state.menu.clear()
 		this.render()  // список был снесён при открытии меню — рисуем заново из уже загруженных данных
+		// возвращаем прокрутку, как она была до меню; повтор на следующем тике на случай,
+		// если страница ещё не успела пересчитать высоту после перерисовки
+		const y = this.state.savedY || 0
+		hmApp.setLayerY(y)
+		setTimeout(() => hmApp.setLayerY(y), 100)
 	},
 
 	reply(m) {
