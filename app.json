@@ -5,8 +5,8 @@
 		"appName": "TG Watch",
 		"appType": "app",
 		"version": {
-			"code": 11,
-			"name": "0.6.0"
+			"code": 12,
+			"name": "0.6.1"
 		},
 		"icon": "icon.png",
 		"vender": "sercatdar",

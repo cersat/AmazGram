@@ -38,6 +38,14 @@ export function arm(state) {
 	return id
 }
 
+// после перезагрузки часов системные будильники пропадают, а флаг "вкл" в файле остаётся —
+// цепочка молча умирает. Поэтому при открытии приложения взводим её заново, предварительно
+// отменив прежний будильник, чтобы не получить две цепочки сразу.
+export function rearm(state) {
+	disarm(state)
+	return arm(state)
+}
+
 export function disarm(state) {
 	if (state.alarmId) {
 		try {

@@ -1,5 +1,5 @@
 import { W, PAD, TOP, C, hideStatusBar, req, Layer, onTap, statusText, button } from '../utils/ui'
-import { loadState, saveState, arm, disarm } from '../utils/alerts'
+import { loadState, saveState, arm, disarm, rearm } from '../utils/alerts'
 
 const ROW_H = 64
 const ROW_GAP = 8
@@ -32,8 +32,13 @@ Page({
 
 	// включает/выключает цепочку будильников (проверка новых сообщений раз в 30 с)
 	initAlarmButton(head) {
-		const state = loadState()
-		const label = () => (state.on ? 'Будильник: вкл' : 'Будильник: выкл')
+		const initial = loadState()
+		let on = initial.on
+		if (on) {
+			// лечит цепочку, потерянную при перезагрузке часов
+			rearm(initial)
+		}
+		const label = () => (on ? 'Будильник: вкл' : 'Будильник: выкл')
 		const btn = button(
 			head,
 			PAD + 20,
@@ -42,29 +47,50 @@ Page({
 			44,
 			label(),
 			() => {
+				// состояние читаем заново: пока страница была открыта, будильник мог сам
+				// обновить файл (новый id будильника, новая точка отсчёта)
+				const state = loadState()
 				if (state.on) {
 					state.on = false
 					disarm(state)
 				} else {
 					state.on = true
-					state.seq = 0 // новая точка отсчёта: старые сообщения будильник не поднимают
+					state.seq = 0
 					arm(state)
+					this.setBaseline()
 				}
 				saveState(state)
+				on = state.on
 				btn.setProperty(hmUI.prop.MORE, {
 					x: PAD + 20,
 					y: TOP + 44,
 					w: W - (PAD + 20) * 2,
 					h: 44,
 					text: label(),
-					normal_color: state.on ? C.ok : C.card,
-					press_color: state.on ? 0x1f8f3d : C.cardPress
+					normal_color: on ? C.ok : C.card,
+					press_color: on ? 0x1f8f3d : C.cardPress
 				})
 			},
-			state.on ? C.ok : C.card,
-			state.on ? 0x1f8f3d : C.cardPress,
+			on ? C.ok : C.card,
+			on ? 0x1f8f3d : C.cardPress,
 			20
 		)
+	},
+
+	// точка отсчёта берётся в момент включения, а не при первом срабатывании через 30 секунд:
+	// иначе всё, что пришло за эти полминуты, будильник никогда не покажет
+	setBaseline() {
+		req('ALERTS', { after: 0 }, 15000)
+			.then((r) => {
+				const state = loadState()
+				if (state.on && state.seq === 0) {
+					state.seq = r.seq
+					saveState(state)
+				}
+			})
+			.catch(() => {
+				// телефон недоступен — точка отсчёта возьмётся при первом срабатывании будильника
+			})
 	},
 
 	load() {
