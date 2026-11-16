@@ -1,3 +1,10 @@
 <resources>
-	<style name="Theme.TgBridge" parent="android:Theme.Material.Light.NoActionBar" />
+	<style name="Theme.TgBridge" parent="android:Theme.Material.NoActionBar">
+		<item name="android:windowBackground">@color/bg</item>
+		<item name="android:statusBarColor">@color/bg</item>
+		<item name="android:navigationBarColor">@color/bg</item>
+		<item name="android:colorAccent">@color/accent</item>
+		<item name="android:colorControlActivated">@color/accent</item>
+		<item name="android:textColorPrimary">@color/text</item>
+	</style>
 </resources>

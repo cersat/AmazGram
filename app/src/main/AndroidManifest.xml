@@ -26,6 +26,10 @@
 			</intent-filter>
 		</activity>
 
+		<activity
+			android:name=".DiagActivity"
+			android:exported="false" />
+
 		<service
 			android:name=".BridgeService"
 			android:exported="false"

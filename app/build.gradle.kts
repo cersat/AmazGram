@@ -11,14 +11,31 @@ android {
 		applicationId = "com.sercatdar.tgbridge"
 		minSdk = 26
 		targetSdk = 34
-		versionCode = 13
-		versionName = "0.1.13"
+		versionCode = 14
+		versionName = "0.1.14"
+	}
+
+	// Один и тот же ключ локально и на GitHub, иначе Android не даст обновить установленное
+	// приложение поверх: подпись новой сборки должна совпадать со старой.
+	signingConfigs {
+		create("app") {
+			storeFile = file("debug.keystore")
+			storePassword = "android"
+			keyAlias = "androiddebugkey"
+			keyPassword = "android"
+		}
 	}
 
 	buildTypes {
 		release {
 			isMinifyEnabled = false
+			signingConfig = signingConfigs.getByName("app")
 		}
+	}
+
+	// линт на релизной сборке в CI только тормозит — проверять код он нам не нужен
+	lint {
+		checkReleaseBuilds = false
 	}
 
 	compileOptions {
