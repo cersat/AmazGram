@@ -489,9 +489,24 @@ class TdSession(
 		if (topicId == 0 && beforeId == 0L) {
 			client.send(TdApi.OpenChat(chatId))
 		}
+		// последняя страница показана на часах — значит, прочитана (старые страницы при подгрузке не трогаем)
+		if (beforeId == 0L) markRead(chatId, topicId, batch)
 		return JSONObject().apply {
 			put("ok", true)
 			put("messages", JSONArray(items))
+		}
+	}
+
+	// Telegram считает прочитанным всё до самого свежего просмотренного сообщения,
+	// поэтому хватает ушедших на часы входящих; в теме непрочитанность не видна заранее, там просто отмечаем
+	private suspend fun markRead(chatId: Long, topicId: Int, batch: List<TdApi.Message>) {
+		if (topicId == 0 && (chatCache[chatId]?.unreadCount ?: 0) == 0) return
+		val ids = batch.filter { !it.isOutgoing }.map { it.id }.toLongArray()
+		if (ids.isEmpty()) return
+		try {
+			client.send(TdApi.ViewMessages(chatId, ids, TdApi.MessageSourceChatHistory(), true))
+		} catch (e: Exception) {
+			DiagLog.add("markRead($chatId): ${e.message}")
 		}
 	}
 

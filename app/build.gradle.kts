@@ -11,8 +11,8 @@ android {
 		applicationId = "com.sercatdar.tgbridge"
 		minSdk = 26
 		targetSdk = 34
-		versionCode = 16
-		versionName = "0.1.16"
+		versionCode = 17
+		versionName = "0.1.17"
 	}
 
 	// Один и тот же ключ локально и на GitHub, иначе Android не даст обновить установленное
