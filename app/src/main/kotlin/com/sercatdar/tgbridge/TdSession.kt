@@ -323,10 +323,29 @@ class TdSession(
 			(reply.messageId == topic.forumTopicId.toLong() || reply.messageId == (topic.forumTopicId.toLong() shl 20))
 		if (reply is TdApi.MessageReplyToMessage && !isTopicRoot) {
 			out.put("reply_id", reply.messageId)
-			val quoteText = reply.quote?.text?.text
-			if (!quoteText.isNullOrBlank()) out.put("reply_preview", cut(quoteText, 40))
+			val preview = replyPreview(msg.chatId, reply)
+			if (!preview.isNullOrBlank()) out.put("reply_preview", preview)
 		}
 		return out
+	}
+
+	// Текст того, на что ответили. quote есть только если ответ сделан цитатой выделенного куска,
+	// у обычного ответа его нет, поэтому оригинал запрашиваем сами: «Имя: начало текста»
+	private suspend fun replyPreview(chatId: Long, reply: TdApi.MessageReplyToMessage): String? {
+		val quote = reply.quote?.text?.text
+		if (!quote.isNullOrBlank()) return cut(quote, 40)
+		return try {
+			val sourceChat = if (reply.chatId != 0L) reply.chatId else chatId
+			val orig = kotlinx.coroutines.withTimeout(2000) {
+				client.send(TdApi.GetMessage(sourceChat, reply.messageId))
+			} as? TdApi.Message ?: return null
+			val text = if (orig.content is TdApi.MessagePoll) "[опрос]" else messageText(orig)
+			val name = if (orig.isOutgoing) "Вы" else cut(senderName(orig.senderId), 10)
+			cut("$name: $text", 40)
+		} catch (e: Exception) {
+			// оригинал удалён или недоступен — на часах останется «ответ на сообщение»
+			null
+		}
 	}
 
 	// --- публичные операции, вызываемые из HTTP-сервера -----------------------------
