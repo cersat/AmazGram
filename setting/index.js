@@ -50,6 +50,7 @@ AppSettingsPage({
 
 			View({ style: box }, [
 				Text({ style: { fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' } }, 'Будильник'),
+				Text({ style: hint }, 'Запасной способ, по умолчанию выключен. Он будит часы и закрывает открытое приложение, поэтому для обычных сообщений лучше уведомления: включи их в TG Bridge и в Zepp (Оповещения приложений).'),
 				Select({
 					label: 'Вибрация',
 					options: [
