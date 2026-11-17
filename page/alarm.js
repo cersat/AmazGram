@@ -8,6 +8,13 @@ const TEXT_SIZE = 22
 const TEXT_MAX = 96
 const REPEATING_SCENES = [1, 5] // эти узоры вибрации не кончаются сами
 
+// уходим через goBack, а не gotoHome: страница будильника открыта поверх другого приложения,
+// и goBack возвращает человека обратно в него (так же закрывается оповещение в Супер-календаре).
+// Чуть позже, чтобы страница не рушилась прямо внутри обработчика своей кнопки
+function leave() {
+	setTimeout(() => hmApp.goBack(), 40)
+}
+
 Page({
 	state: {
 		vibrate: null,
@@ -54,7 +61,7 @@ Page({
 	// чтобы они не светились из-за пустой проверки
 	leaveQuietly() {
 		if (this.state.wasOff) hmSetting.setScreenOff()
-		else hmApp.gotoHome()
+		else leave()
 	},
 
 	onDestroy() {
@@ -169,7 +176,7 @@ Page({
 		const close = () => {
 			this.stopVibration()
 			resumeChain()
-			hmApp.gotoHome()
+			leave()
 		}
 		// страницу нельзя ломать удалением виджетов из их же обработчиков (ZeppOS 1.0),
 		// поэтому кнопки только уходят на другую страницу и ничего не сносят
