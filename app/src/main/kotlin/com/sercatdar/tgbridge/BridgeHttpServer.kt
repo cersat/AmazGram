@@ -96,6 +96,12 @@ class BridgeHttpServer(
 	}
 
 	private fun body(s: IHTTPSession): JSONObject {
+		// NanoHTTPD декодирует тело по charset из Content-Type, а без него берёт US-ASCII, и вся кириллица
+		// превращается в «�». Часы charset не присылают, поэтому всегда объявляем UTF-8 сами.
+		val type = s.headers["content-type"]
+		if (type == null || !type.contains("charset", ignoreCase = true)) {
+			s.headers["content-type"] = (type ?: "application/json") + "; charset=utf-8"
+		}
 		val map = HashMap<String, String>()
 		s.parseBody(map)
 		val raw = map["postData"] ?: "{}"
